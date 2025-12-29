@@ -9,6 +9,8 @@ class TrafficGenerator:
     def generate_routefile(self, seed):
         """
         Generation of the route of every car for one episode
+        Adapted for Baneswor network with edges: DR2, RU1, UL2, LD1 (incoming)
+        and DL2, LU1, UR2, RD1 (outgoing)
         """
         np.random.seed(seed)  # make tests reproducible
 
@@ -30,50 +32,70 @@ class TrafficGenerator:
         # produce the file for cars generation, one car per line
         with open("intersection/episode_routes.rou.xml", "w") as routes:
             print("""<routes>
-            <vType accel="1.0" decel="4.5" id="standard_car" length="5.0" minGap="2.5" maxSpeed="25" sigma="0.5" />
+    <vType accel="1.0" decel="4.5" id="standard_car" length="5.0" minGap="2.5" maxSpeed="25" sigma="0.5" />
 
-            <route id="W_N" edges="W2TL TL2N"/>
-            <route id="W_E" edges="W2TL TL2E"/>
-            <route id="W_S" edges="W2TL TL2S"/>
-            <route id="N_W" edges="N2TL TL2W"/>
-            <route id="N_E" edges="N2TL TL2E"/>
-            <route id="N_S" edges="N2TL TL2S"/>
-            <route id="E_W" edges="E2TL TL2W"/>
-            <route id="E_N" edges="E2TL TL2N"/>
-            <route id="E_S" edges="E2TL TL2S"/>
-            <route id="S_W" edges="S2TL TL2W"/>
-            <route id="S_N" edges="S2TL TL2N"/>
-            <route id="S_E" edges="S2TL TL2E"/>""", file=routes)
+    <!-- Routes for Baneswor Network -->
+    <!-- From DR2 (Down-Right, coming from South) -->
+    <route id="DR2_LU1" edges="DR2 LU1"/>
+    <route id="DR2_UR2" edges="DR2 UR2"/>
+    <route id="DR2_RD1" edges="DR2 RD1"/>
+    
+    <!-- From RU1 (Right-Up, coming from East) -->
+    <route id="RU1_DL2" edges="RU1 DL2"/>
+    <route id="RU1_LU1" edges="RU1 LU1"/>
+    <route id="RU1_UR2" edges="RU1 UR2"/>
+    
+    <!-- From UL2 (Up-Left, coming from North) -->
+    <route id="UL2_RD1" edges="UL2 RD1"/>
+    <route id="UL2_DL2" edges="UL2 DL2"/>
+    <route id="UL2_LU1" edges="UL2 LU1"/>
+    
+    <!-- From LD1 (Left-Down, coming from West) -->
+    <route id="LD1_UR2" edges="LD1 UR2"/>
+    <route id="LD1_RD1" edges="LD1 RD1"/>
+    <route id="LD1_DL2" edges="LD1 DL2"/>""", file=routes)
 
             for car_counter, step in enumerate(car_gen_steps):
                 straight_or_turn = np.random.uniform()
                 if straight_or_turn < 0.75:  # choose direction: straight or turn - 75% of times the car goes straight
                     route_straight = np.random.randint(1, 5)  # choose a random source & destination
                     if route_straight == 1:
-                        print('    <vehicle id="W_E_%i" type="standard_car" route="W_E" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # South to North (DR2 to UR2)
+                        print('    <vehicle id="DR2_UR2_%i" type="standard_car" route="DR2_UR2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_straight == 2:
-                        print('    <vehicle id="E_W_%i" type="standard_car" route="E_W" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # East to West (RU1 to LU1)
+                        print('    <vehicle id="RU1_LU1_%i" type="standard_car" route="RU1_LU1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_straight == 3:
-                        print('    <vehicle id="N_S_%i" type="standard_car" route="N_S" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # North to South (UL2 to DL2)
+                        print('    <vehicle id="UL2_DL2_%i" type="standard_car" route="UL2_DL2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     else:
-                        print('    <vehicle id="S_N_%i" type="standard_car" route="S_N" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
-                else:  # car that turn -25% of the time the car turns
-                    route_turn = np.random.randint(1, 9)  # choose random source source & destination
+                        # West to East (LD1 to RD1)
+                        print('    <vehicle id="LD1_RD1_%i" type="standard_car" route="LD1_RD1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                else:  # car that turn - 25% of the time the car turns
+                    route_turn = np.random.randint(1, 9)  # choose random source & destination
                     if route_turn == 1:
-                        print('    <vehicle id="W_N_%i" type="standard_car" route="W_N" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # South to West (DR2 to LU1) - Left turn
+                        print('    <vehicle id="DR2_LU1_%i" type="standard_car" route="DR2_LU1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 2:
-                        print('    <vehicle id="W_S_%i" type="standard_car" route="W_S" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # South to East (DR2 to RD1) - Right turn
+                        print('    <vehicle id="DR2_RD1_%i" type="standard_car" route="DR2_RD1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 3:
-                        print('    <vehicle id="N_W_%i" type="standard_car" route="N_W" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # East to South (RU1 to DL2) - Left turn
+                        print('    <vehicle id="RU1_DL2_%i" type="standard_car" route="RU1_DL2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 4:
-                        print('    <vehicle id="N_E_%i" type="standard_car" route="N_E" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # East to North (RU1 to UR2) - Right turn
+                        print('    <vehicle id="RU1_UR2_%i" type="standard_car" route="RU1_UR2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 5:
-                        print('    <vehicle id="E_N_%i" type="standard_car" route="E_N" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # North to East (UL2 to RD1) - Left turn
+                        print('    <vehicle id="UL2_RD1_%i" type="standard_car" route="UL2_RD1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 6:
-                        print('    <vehicle id="E_S_%i" type="standard_car" route="E_S" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # North to West (UL2 to LU1) - Right turn
+                        print('    <vehicle id="UL2_LU1_%i" type="standard_car" route="UL2_LU1" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 7:
-                        print('    <vehicle id="S_W_%i" type="standard_car" route="S_W" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # West to North (LD1 to UR2) - Left turn
+                        print('    <vehicle id="LD1_UR2_%i" type="standard_car" route="LD1_UR2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
                     elif route_turn == 8:
-                        print('    <vehicle id="S_E_%i" type="standard_car" route="S_E" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
+                        # West to South (LD1 to DL2) - Right turn
+                        print('    <vehicle id="LD1_DL2_%i" type="standard_car" route="LD1_DL2" depart="%s" departLane="random" departSpeed="10" />' % (car_counter, step), file=routes)
 
             print("</routes>", file=routes)

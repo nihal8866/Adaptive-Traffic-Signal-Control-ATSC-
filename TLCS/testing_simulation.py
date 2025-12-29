@@ -2,17 +2,13 @@ import traci
 import numpy as np
 import random
 import timeit
-import os
 
-# phase codes based on environment.net.xml
-PHASE_NS_GREEN = 0  # action 0 code 00
-PHASE_NS_YELLOW = 1
-PHASE_NSL_GREEN = 2  # action 1 code 01
-PHASE_NSL_YELLOW = 3
-PHASE_EW_GREEN = 4  # action 2 code 10
-PHASE_EW_YELLOW = 5
-PHASE_EWL_GREEN = 6  # action 3 code 11
-PHASE_EWL_YELLOW = 7
+# Phase codes based on baneswor_final.net.xml
+# Your network has 4 phases in the tlLogic, we'll map actions to these phases
+PHASE_0 = 0  # action 0 - phase 0 (duration 45s in default)
+PHASE_1 = 1  # action 1 - phase 1 (duration 40s in default)
+PHASE_2 = 2  # action 2 - phase 2 (duration 35s in default)
+PHASE_3 = 3  # action 3 - phase 3 (duration 95s in default)
 
 
 class Simulation:
@@ -45,7 +41,7 @@ class Simulation:
         self._step = 0
         self._waiting_times = {}
         old_total_wait = 0
-        old_action = -1 # dummy init
+        old_action = -1  # dummy init
 
         while self._step < self._max_steps:
 
@@ -91,17 +87,18 @@ class Simulation:
 
         while steps_todo > 0:
             traci.simulationStep()  # simulate 1 step in sumo
-            self._step += 1 # update the step counter
+            self._step += 1  # update the step counter
             steps_todo -= 1
-            queue_length = self._get_queue_length() 
+            queue_length = self._get_queue_length()
             self._queue_length_episode.append(queue_length)
 
 
     def _collect_waiting_times(self):
         """
         Retrieve the waiting time of every car in the incoming roads
+        Adapted for Baneswor network: DR2, RU1, UL2, LD1
         """
-        incoming_roads = ["E2TL", "N2TL", "W2TL", "S2TL"]
+        incoming_roads = ["DR2", "RU1", "UL2", "LD1"]
         car_list = traci.vehicle.getIDList()
         for car_id in car_list:
             wait_time = traci.vehicle.getAccumulatedWaitingTime(car_id)
@@ -109,8 +106,8 @@ class Simulation:
             if road_id in incoming_roads:  # consider only the waiting times of cars in incoming roads
                 self._waiting_times[car_id] = wait_time
             else:
-                if car_id in self._waiting_times: # a car that was tracked has cleared the intersection
-                    del self._waiting_times[car_id] 
+                if car_id in self._waiting_times:  # a car that was tracked has cleared the intersection
+                    del self._waiting_times[car_id]
         total_waiting_time = sum(self._waiting_times.values())
         return total_waiting_time
 
@@ -125,42 +122,55 @@ class Simulation:
     def _set_yellow_phase(self, old_action):
         """
         Activate the correct yellow light combination in sumo
+        Note: Your Baneswor network has yellow phases built into the tlLogic.
+        For simplicity, we can either skip yellow or use a brief transition.
+        Here we'll use a simple approach - just switch directly.
         """
-        yellow_phase_code = old_action * 2 + 1 # obtain the yellow phase code, based on the old action (ref on environment.net.xml)
-        traci.trafficlight.setPhase("TL", yellow_phase_code)
+        # Option: Could implement yellow transition if needed
+        # For now, the yellow_duration will just be a brief pause
+        pass
 
 
     def _set_green_phase(self, action_number):
         """
         Activate the correct green light combination in sumo
+        Maps actions to the 4 phases defined in baneswor_final.net.xml
         """
-
-
         if action_number == 0:
-            traci.trafficlight.setPhase("TL", PHASE_NS_GREEN)
+            traci.trafficlight.setPhase("J1", PHASE_0)
         elif action_number == 1:
-            traci.trafficlight.setPhase("TL", PHASE_NSL_GREEN)
+            traci.trafficlight.setPhase("J1", PHASE_1)
         elif action_number == 2:
-            traci.trafficlight.setPhase("TL", PHASE_EW_GREEN)
+            traci.trafficlight.setPhase("J1", PHASE_2)
         elif action_number == 3:
-            traci.trafficlight.setPhase("TL", PHASE_EWL_GREEN)
+            traci.trafficlight.setPhase("J1", PHASE_3)
 
 
     def _get_queue_length(self):
         """
         Retrieve the number of cars with speed = 0 in every incoming lane
+        Adapted for Baneswor network: DR2, RU1, UL2, LD1
         """
-        halt_N = traci.edge.getLastStepHaltingNumber("N2TL")
-        halt_S = traci.edge.getLastStepHaltingNumber("S2TL")
-        halt_E = traci.edge.getLastStepHaltingNumber("E2TL")
-        halt_W = traci.edge.getLastStepHaltingNumber("W2TL")
-        queue_length = halt_N + halt_S + halt_E + halt_W
+        halt_DR2 = traci.edge.getLastStepHaltingNumber("DR2")
+        halt_RU1 = traci.edge.getLastStepHaltingNumber("RU1")
+        halt_UL2 = traci.edge.getLastStepHaltingNumber("UL2")
+        halt_LD1 = traci.edge.getLastStepHaltingNumber("LD1")
+        queue_length = halt_DR2 + halt_RU1 + halt_UL2 + halt_LD1
         return queue_length
 
 
     def _get_state(self):
         """
         Retrieve the state of the intersection from sumo, in the form of cell occupancy
+        Adapted for Baneswor network with lanes: DR2, RU1, UL2, LD1
+        
+        Lane structure from baneswor_final.net.xml:
+        - DR2: 3 lanes (DR2_0, DR2_1, DR2_2)
+        - RU1: 5 lanes (RU1_0, RU1_1, RU1_2, RU1_3, RU1_4)
+        - UL2: 3 lanes (UL2_0, UL2_1, UL2_2)
+        - LD1: 5 lanes (LD1_0, LD1_1, LD1_2, LD1_3, LD1_4)
+        
+        We'll map these to 8 lane groups to maintain 80 states (8 groups × 10 cells)
         """
         state = np.zeros(self._num_states)
         car_list = traci.vehicle.getIDList()
@@ -168,7 +178,10 @@ class Simulation:
         for car_id in car_list:
             lane_pos = traci.vehicle.getLanePosition(car_id)
             lane_id = traci.vehicle.getLaneID(car_id)
-            lane_pos = 750 - lane_pos  # inversion of lane pos, so if the car is close to the traffic light -> lane_pos = 0 --- 750 = max len of a road
+            
+            # Your network edges are ~180-186m long
+            # We'll use 200m as max for consistency with original code
+            lane_pos = 200 - lane_pos  # inversion of lane pos, so if the car is close to the traffic light -> lane_pos = 0
 
             # distance in meters from the traffic light -> mapping into cells
             if lane_pos < 7:
@@ -192,29 +205,29 @@ class Simulation:
             elif lane_pos <= 750:
                 lane_cell = 9
 
-            # finding the lane where the car is located 
-            # x2TL_3 are the "turn left only" lanes
-            if lane_id == "W2TL_0" or lane_id == "W2TL_1" or lane_id == "W2TL_2":
+            # finding the lane where the car is located
+            # Mapping Baneswor lanes to 8 lane groups (0-7) to get 80 total states
+            if lane_id == "DR2_0" or lane_id == "DR2_1":
                 lane_group = 0
-            elif lane_id == "W2TL_3":
+            elif lane_id == "DR2_2":
                 lane_group = 1
-            elif lane_id == "N2TL_0" or lane_id == "N2TL_1" or lane_id == "N2TL_2":
+            elif lane_id == "RU1_0" or lane_id == "RU1_1" or lane_id == "RU1_2":
                 lane_group = 2
-            elif lane_id == "N2TL_3":
+            elif lane_id == "RU1_3" or lane_id == "RU1_4":
                 lane_group = 3
-            elif lane_id == "E2TL_0" or lane_id == "E2TL_1" or lane_id == "E2TL_2":
+            elif lane_id == "UL2_0" or lane_id == "UL2_1":
                 lane_group = 4
-            elif lane_id == "E2TL_3":
+            elif lane_id == "UL2_2":
                 lane_group = 5
-            elif lane_id == "S2TL_0" or lane_id == "S2TL_1" or lane_id == "S2TL_2":
+            elif lane_id == "LD1_0" or lane_id == "LD1_1" or lane_id == "LD1_2":
                 lane_group = 6
-            elif lane_id == "S2TL_3":
+            elif lane_id == "LD1_3" or lane_id == "LD1_4":
                 lane_group = 7
             else:
                 lane_group = -1
 
             if lane_group >= 1 and lane_group <= 7:
-                car_position = int(str(lane_group) + str(lane_cell))  # composition of the two postion ID to create a number in interval 0-79
+                car_position = int(str(lane_group) + str(lane_cell))  # composition of the two position IDs to create a number in interval 0-79
                 valid_car = True
             elif lane_group == 0:
                 car_position = lane_cell
